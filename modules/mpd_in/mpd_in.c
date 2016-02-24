@@ -29,6 +29,7 @@
 
 #include <gpac/dash.h>
 #include <gpac/internal/terminal_dev.h>
+#include <gpac/internal/mpd.h> //Romain: should be elsewhere?
 
 typedef enum
 {
@@ -120,13 +121,12 @@ Bool MPD_CanHandleURL(GF_InputService *plug, const char *url)
 	return gf_dash_check_mpd_root_type(url);
 }
 
-
 static s32 gf_dash_get_group_idx_from_service(GF_MPD_In *mpdin, GF_InputService *ifce)
 {
 	s32 i;
 
 	for (i=0; (u32) i < gf_dash_get_group_count(mpdin->dash); i++) {
-		GF_MPDGroup *group = gf_dash_get_group_udta(mpdin->dash, i);
+		GF_MPDGroup *group = (GF_MPDGroup*)gf_dash_get_group_udta(mpdin->dash, i);
 		if (!group) continue;
 		if (group->segment_ifce == ifce) {
 			return i;
@@ -134,7 +134,6 @@ static s32 gf_dash_get_group_idx_from_service(GF_MPD_In *mpdin, GF_InputService 
 	}
 	return -1;
 }
-
 
 static void mpdin_connect_ack(GF_ClientService *service, LPNETCHANNEL ns, GF_Err response)
 {
@@ -144,7 +143,7 @@ static void mpdin_connect_ack(GF_ClientService *service, LPNETCHANNEL ns, GF_Err
 		mpdin->fn_connect_ack(mpdin->service, ns, response);
 }
 
-void mpdin_data_packet(GF_ClientService *service, LPNETCHANNEL ns, char *data, u32 data_size, GF_SLHeader *hdr, GF_Err reception_status)
+static void mpdin_data_packet(GF_ClientService *service, LPNETCHANNEL ns, char *data, u32 data_size, GF_SLHeader *hdr, GF_Err reception_status)
 {
 	s32 i;
 	GF_MPD_In *mpdin = (GF_MPD_In*) service->ifce->priv;
@@ -268,7 +267,6 @@ void mpdin_data_packet(GF_ClientService *service, LPNETCHANNEL ns, char *data, u
 		gf_service_command(service, &com, GF_OK);
 	}
 }
-
 
 static void MPD_NotifyData(GF_MPDGroup *group, Bool chunk_flush)
 {
@@ -489,8 +487,6 @@ static GF_Err MPD_LoadMediaService(GF_MPD_In *mpdin, u32 group_index, const char
 	return GF_CODEC_NOT_FOUND;
 }
 
-
-
 GF_InputService *MPD_GetInputServiceForChannel(GF_MPD_In *mpdin, LPNETCHANNEL channel)
 {
 	GF_Channel *ch;
@@ -542,7 +538,6 @@ GF_Err MPD_DisconnectChannel(GF_InputService *plug, LPNETCHANNEL channel)
 
 	return segment_ifce->DisconnectChannel(segment_ifce, channel);
 }
-
 
 static void mpdin_dash_segment_netio(void *cbk, GF_NETIO_Parameter *param)
 {
@@ -686,7 +681,6 @@ u32 mpdin_dash_io_get_bytes_done(GF_DASHFileIO *dashio, GF_DASHFileIOSession ses
 	gf_dm_sess_get_stats((GF_DownloadSession *)session, NULL, NULL, NULL, &size, NULL, NULL);
 	return size;
 }
-
 
 GF_Err mpdin_dash_io_on_dash_event(GF_DASHFileIO *dashio, GF_DASHEventType dash_evt, s32 group_idx, GF_Err error_code)
 {
@@ -894,6 +888,235 @@ GF_Err mpdin_dash_io_on_dash_event(GF_DASHFileIO *dashio, GF_DASHEventType dash_
 	return GF_OK;
 }
 
+/* Estimate the maximum speed that we can play, using our statistic. If it is below the max_playout_rate (@maxPlayoutRate) in MPD, return max_playout_rate*/
+static Double dash_get_max_available_speed(GF_DASH_Group *group, GF_MPD_Representation *rep)
+{
+	Double max_available_speed = 0;
+	Double max_dl_speed, max_decoding_speed;
+	u32 framerate;
+
+	u32 bytes_per_sec, total_size;
+	u64 current_downloaded_segment_duration;
+
+	u32 avg_dec_time, max_dec_time, irap_avg_dec_time, irap_max_dec_time;
+	Bool codec_reset, decode_only_rap;
+
+	gf_dash_group_get_last_segment_stats(group, &total_size, &bytes_per_sec, &current_downloaded_segment_duration);
+	gf_dash_group_codec_stats(group, &avg_dec_time, &max_dec_time, &irap_avg_dec_time, &irap_max_dec_time, &codec_reset, &decode_only_rap);
+	
+	max_dl_speed = 8.0*bytes_per_sec / rep->bandwidth;
+	//if framerate is not in MPD, suppose that it is 25 fps
+	framerate = rep->framerate ? rep->framerate->num : 25;
+	if (decode_only_rap == GF_TRUE)
+		max_decoding_speed = irap_max_dec_time ? 1000000.0 / irap_max_dec_time : 0;
+	else
+		max_decoding_speed = avg_dec_time ? 1000000.0 / (max_dec_time + avg_dec_time*(framerate - 1)) : 0;
+	max_available_speed = max_decoding_speed > max_dl_speed ? max_dl_speed : max_decoding_speed;
+	GF_LOG(GF_LOG_DEBUG, GF_LOG_DASH, ("[DASH] Representation %s max playout rate: in MPD %f - calculated by stat: %f\n", rep->id, rep->max_playout_rate, max_available_speed));
+	return max_available_speed/2; // for testing and debug
+}
+
+void mpdin_dash_io_do_rate_adaptation(GF_DASHFileIO *dashio, GF_DASH_Group *group)
+{
+	//Romain: duplicate dash_do_rate_adaptation
+	//Romain: GF_DashClient *dash = group->dash;
+	Double speed;
+	u32 k, dl_rate;
+	Bool go_up_bitrate = GF_FALSE;
+	u32 nb_inter_rep = 0, active_rep_index;
+	u32 bytes_per_sec, total_size;
+	u32 buffer_min_ms, buffer_max_ms, buffer_occupancy_ms, buffer_occupancy_at_last_seg;
+	u32 min_representation_bitrate;
+	u64 current_downloaded_segment_duration;
+	GF_MPD_Representation *rep, *new_rep;
+	Double max_available_speed;
+	Bool force_below_resolution = GF_FALSE;
+	GF_DASH_Group *base_group = group;
+	Bool do_switch = GF_TRUE;
+
+	//Romain: if (dash->auto_switch_count) return;
+	//Romain: if (dash->disable_switching) return;
+
+	gf_dash_group_get_last_segment_stats(group, &total_size, &bytes_per_sec, &current_downloaded_segment_duration);
+	//nothing downloaded for this group, no rate adaptation to be done
+	if (!total_size || !bytes_per_sec) {
+		return;
+	}
+
+	rep = gf_list_get(gf_dash_group_get_representations(group, &active_rep_index), active_rep_index);
+
+	while (gf_dash_group_depend_on_group(base_group)) {
+		base_group = gf_dash_group_depend_on_group(base_group);
+	}
+
+	//adjust the download rate according to the playback speed
+	speed = gf_dash_group_get_speed(group);
+	if (speed < 0)
+		speed = -speed;
+	dl_rate = (u32) (8*bytes_per_sec / speed);
+
+	if (rep->bandwidth < dl_rate) {
+		go_up_bitrate = GF_TRUE;
+	}
+	min_representation_bitrate = gf_dash_group_get_min_rep_bitrate(group);
+	if (dl_rate < min_representation_bitrate)
+		dl_rate = min_representation_bitrate;
+
+	/*reset and query codec and buffer stats*/
+	gf_dash_group_reset_and_query_stats(group);
+	//Romain: rep above? if (rep->playback.waiting_codec_reset && codec_reset)
+	//Romain	rep->playback.waiting_codec_reset = GF_FALSE;
+
+	/*check whether we can play with this speed; if not force to switch to the below resolution*/
+	if (!rep->playback.waiting_codec_reset) {
+		max_available_speed = dash_get_max_available_speed(base_group, rep);
+		if (max_available_speed && (speed > max_available_speed))
+			force_below_resolution = GF_TRUE;
+	}
+
+	/*buffer-based control: if we are below half of the buffer don't try to go up and limit rate to less than our current rep bandwidth*/
+	gf_dash_group_get_buffer_stats(group, &buffer_min_ms, &buffer_max_ms, &buffer_occupancy_ms, &buffer_occupancy_at_last_seg);
+	if (buffer_max_ms) {
+		u32 buf_high_threshold, buf_low_threshold;
+		s32 occ;
+
+		if (current_downloaded_segment_duration && (buffer_max_ms > current_downloaded_segment_duration))
+			buf_high_threshold = buffer_max_ms - (u32) current_downloaded_segment_duration;
+		else
+			buf_high_threshold = 2*buffer_max_ms/3;
+
+		buf_low_threshold = (current_downloaded_segment_duration && (buffer_min_ms>10)) ? buffer_min_ms : (u32) current_downloaded_segment_duration;
+		if (buf_low_threshold > buffer_max_ms) buf_low_threshold = 1*buffer_max_ms/3;
+
+		//compute how much we managed to refill (current state minus previous state)
+		occ = (s32) buffer_occupancy_ms;
+		occ -= (s32) buffer_occupancy_at_last_seg;
+		//if above max buffer force occ>0 since a segment may still be pending and not dispatched (buffer regulation)
+		if (buffer_occupancy_ms > buffer_max_ms) occ=1;
+
+		//switch down if current buffer falls below min threshold
+		if ( (s32) buffer_occupancy_ms < (s32) buf_low_threshold) {
+			if (!buffer_occupancy_ms)
+				dl_rate = min_representation_bitrate;
+			else
+				dl_rate = (rep->bandwidth>10) ? rep->bandwidth - 10 : 1;
+			go_up_bitrate = GF_FALSE;
+			GF_LOG(GF_LOG_INFO, GF_LOG_DASH, ("[DASH] AS#%d bitrate %d bps buffer max %d current %d refill since last %d - running low, switching down, target rate %d\n", 1+gf_dash_group_get_as_index_in_period(group), rep->bandwidth, buffer_max_ms, buffer_occupancy_ms, occ, dl_rate));
+		}
+		//switch up if above max threshold and buffer refill is fast enough
+		else if ((occ>0) && (buffer_occupancy_ms > buf_high_threshold)) {
+			GF_LOG(GF_LOG_INFO, GF_LOG_DASH, ("[DASH] AS#%d bitrate %d bps buffer max %d current %d refill since last %d - running high, will try to switch up, target rate %d\n", 1+gf_dash_group_get_as_index_in_period(group), rep->bandwidth, buffer_max_ms, buffer_occupancy_ms, occ, dl_rate));
+			go_up_bitrate = GF_TRUE;
+		}
+		//don't do anything in the middle or if refill not fast enough
+		else {
+			do_switch = GF_FALSE;
+			GF_LOG(GF_LOG_INFO, GF_LOG_DASH, ("[DASH] AS#%d bitrate %d bps buffer max %d current %d refill since last %d - steady\n", 1+gf_dash_group_get_as_index_in_period(group), rep->bandwidth, buffer_max_ms, buffer_occupancy_ms, occ));
+		}
+	}
+
+	/*find best bandwidth that fits our bitrate and playing speed*/
+	new_rep = NULL;
+
+	if (do_switch) {
+		for (k=0; k<gf_dash_group_get_num_reps(group) && do_switch; k++) {
+			GF_MPD_Representation *arep = gf_list_get(gf_dash_group_get_representations(group, NULL), k);
+			GF_LOG(GF_LOG_DEBUG, GF_LOG_DASH, ("[DASH] Repesentation %s prev max available speed: %f \n", arep->id, arep->playback.prev_max_available_speed));
+			if (arep->playback.disabled) continue;
+			if (arep->playback.prev_max_available_speed && (speed > arep->playback.prev_max_available_speed))
+				continue;
+
+			if (dl_rate >= arep->bandwidth) {
+				if (force_below_resolution && (gf_dash_group_get_speed_adaptation(group) == GF_TRUE)) {
+					if (!k) GF_LOG(GF_LOG_DEBUG, GF_LOG_DASH, ("[DASH] Speed adaptation\n"));
+					/*try to switch to highest quality below the current one*/
+					if ((arep->quality_ranking < rep->quality_ranking) || (arep->width < rep->width) || (arep->height < rep->height)) {
+						if (!new_rep)
+							new_rep = arep;
+						else if ((arep->quality_ranking > new_rep->quality_ranking) || (arep->width > new_rep->width) || (arep->height > new_rep->height))
+							new_rep = arep;
+					}
+					rep->playback.prev_max_available_speed = max_available_speed;
+					go_up_bitrate = GF_FALSE;
+				} else {
+					if (!k) GF_LOG(GF_LOG_DEBUG, GF_LOG_DASH, ("[DASH] Bitrate adaptation\n"));
+					if (!new_rep) new_rep = arep;
+					else if (go_up_bitrate) {
+#if 0
+						/*try to switch to highest bitrate below available download rate*/
+						if (arep->bandwidth > new_rep->bandwidth) {
+							if (new_rep->bandwidth > rep->bandwidth) {
+								nb_inter_rep ++;
+							}
+							new_rep = arep;
+						} else if (arep->bandwidth > rep->bandwidth) {
+							nb_inter_rep ++;
+						}
+#else
+						/*try to switch to lowest bitrate above our current rep*/
+						if (new_rep->bandwidth<=rep->bandwidth) {
+							new_rep = arep;
+						} else if ( (arep->bandwidth < new_rep->bandwidth) && (arep->bandwidth > rep->bandwidth)) {
+							new_rep = arep;
+						}
+#endif
+					} else {
+						/*try to switch to highest bitrate below available download rate*/
+						if (arep->bandwidth > new_rep->bandwidth) {
+							new_rep = arep;
+						}
+					}
+				}
+			}
+		}
+
+		if (!new_rep || (new_rep==rep)) {
+			GF_LOG(GF_LOG_INFO, GF_LOG_DASH, ("[DASH] AS#%d no rep found better matching requested bandwidth %d - not switching !\n", 1+gf_dash_group_get_as_index_in_period(group), dl_rate));
+			do_switch = GF_FALSE;
+		}
+	}
+
+	if (do_switch) {
+		//if we're switching to the next upper bitrate (no intermediate bitrates), do not immediately switch
+		//but for a given number of segments - this avoids fluctuation in the quality
+		if (go_up_bitrate && ! nb_inter_rep) {
+			new_rep->playback.probe_switch_count++;
+			if (new_rep->playback.probe_switch_count > dash->probe_times_before_switch) {
+				new_rep->playback.probe_switch_count = 0;
+			} else {
+				do_switch = GF_FALSE;
+			}
+		}
+	}
+
+	if (do_switch) {
+		//Romain: GF_LOG(GF_LOG_INFO, GF_LOG_DASH, ("[DASH] AS#%d switching after playing %d segments from current rep\n", 1+gf_dash_group_get_as_index_in_period(group), group->nb_segments_since_switch));
+		//Romain: group->nb_segments_since_switch = 0;
+
+		if (force_below_resolution) {
+			new_rep->playback.waiting_codec_reset = GF_TRUE;
+			GF_LOG(GF_LOG_INFO, GF_LOG_DASH, ("[DASH] AS#%d switching representation from bandwidth %d bps to %d bps at UTC "LLU" ms (playback speed %lf)\n", 1+gf_dash_group_get_as_index_in_period(group), rep->bandwidth, new_rep->bandwidth, gf_net_get_utc(), gf_dash_group_get_speed(group) ));
+		} else {
+			GF_LOG(GF_LOG_INFO, GF_LOG_DASH, ("[DASH] AS#%d switching representation %s from bandwidth %d bps to %d bps at UTC "LLU" ms (download rate %d)\n", 1+gf_dash_group_get_as_index_in_period(group), go_up_bitrate ? "up" : "down", rep->bandwidth, new_rep->bandwidth, gf_net_get_utc(), dl_rate));
+		}
+
+		//Romain: gf_dash_set_group_representation(group, new_rep);
+	}
+
+	buffer_occupancy_at_last_seg = buffer_occupancy_ms;
+
+	for (k=0; k<gf_dash_group_get_num_reps(group); k++) {
+		GF_MPD_Representation *arep = gf_list_get(gf_dash_group_get_representations(group, NULL), k);
+		if (new_rep==arep) continue;
+		arep->playback.probe_switch_count = 0;
+	}
+
+	if (force_below_resolution && !new_rep) {
+		GF_LOG(GF_LOG_ERROR, GF_LOG_DASH, ("[DASH] Speed %lf is too fast to play - speed down \n", gf_dash_group_get_speed(group)));
+		/*FIXME: should do something here*/
+	}
+}
+
 /*check in all groups if the service can support reverse playback (speed<0); return GF_OK only if service is supported in all groups*/
 static GF_Err mpdin_dash_can_reverse_playback(GF_MPD_In *mpdin)
 {
@@ -914,7 +1137,6 @@ static GF_Err mpdin_dash_can_reverse_playback(GF_MPD_In *mpdin)
 
 	return e;
 }
-
 
 GF_Err MPD_ConnectService(GF_InputService *plug, GF_ClientService *serv, const char *url)
 {
@@ -954,6 +1176,7 @@ GF_Err MPD_ConnectService(GF_InputService *plug, GF_ClientService *serv, const c
 	mpdin->dash_io.get_total_size = mpdin_dash_io_get_total_size;
 	mpdin->dash_io.get_bytes_done = mpdin_dash_io_get_bytes_done;
 	mpdin->dash_io.on_dash_event = mpdin_dash_io_on_dash_event;
+	mpdin->dash_io.do_rate_adaptation = mpdin_dash_io_do_rate_adaptation;
 
 	max_cache_duration = 0;
 	opt = gf_modules_get_option((GF_BaseInterface *)plug, "Network", "BufferLength");
@@ -1163,7 +1386,6 @@ static GF_Descriptor *MPD_GetServiceDesc(GF_InputService *plug, u32 expect_type,
 	}
 	return NULL;
 }
-
 
 GF_Err MPD_CloseService(GF_InputService *plug)
 {

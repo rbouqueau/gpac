@@ -60,13 +60,11 @@ typedef enum {
 //#define FORCE_DESYNC	4000
 
 
-typedef struct __dash_group GF_DASH_Group;
-
 struct __dash_client
 {
 	GF_DASHFileIO *dash_io;
 
-	/*interface to mpd parser - get rid of this and use the DASHIO instead ?*/
+	/*interface to mpd parser - TODO: get rid of this and use the DASHIO instead ?*/
 	GF_FileDownload getter;
 
 	char *base_url;
@@ -259,7 +257,7 @@ struct __dash_group
 	u32 nb_consecutive_segments_lost;
 	u64 retry_after_utc;
 	/*set when switching segment, indicates the current downloaded segment duration*/
-	u64 current_downloaded_segment_duration;
+	u64 current_downloaded_segment_duration; //Romain: why not last_seg_dur?? which unit?
 
 	char *service_mime;
 
@@ -298,6 +296,81 @@ struct __dash_group
 	struct _dash_srd_desc *srd_desc;
 };
 
+//Romain: add to export.cpp
+GF_EXPORT
+void gf_dash_group_get_last_segment_stats(const GF_DASH_Group *group, u32 *total_size, u32 *bytes_per_sec, u64 *current_downloaded_segment_duration)
+{
+	*total_size    = group->total_size;
+	*bytes_per_sec = group->bytes_per_sec;
+	*current_downloaded_segment_duration = group->current_downloaded_segment_duration;
+}
+
+//Romain: add to export.cpp
+GF_EXPORT
+void gf_dash_group_get_buffer_stats(const GF_DASH_Group *group, u32 *buffer_min_ms, u32 *buffer_max_ms, u32 *buffer_occupancy_ms, u32 *buffer_occupancy_at_last_seg)
+{
+	*buffer_min_ms                = group->buffer_min_ms;
+	*buffer_max_ms                = group->buffer_max_ms;
+	*buffer_occupancy_ms          = group->buffer_occupancy_ms;
+	*buffer_occupancy_at_last_seg = group->buffer_occupancy_at_last_seg;
+}
+
+//Romain: add to export.cpp
+GF_EXPORT
+void gf_dash_group_reset_and_query_stats(GF_DASH_Group *group)
+{
+	group->buffer_max_ms = group->buffer_occupancy_ms = 0;
+	group->codec_reset = 0;
+
+	/*query codec and buffer statistics*/
+	group->dash->dash_io->on_dash_event(group->dash->dash_io, GF_DASH_EVENT_CODEC_STAT_QUERY, gf_list_find(group->dash->groups, group), GF_OK);
+}
+
+//Romain: add to export.cpp
+GF_EXPORT
+void gf_dash_group_codec_stats(const GF_DASH_Group *group, u32 *avg_dec_time, u32 *max_dec_time, u32 *irap_avg_dec_time, u32 *irap_max_dec_time, Bool *codec_reset, Bool *decode_only_rap) {
+	*avg_dec_time      = group->avg_dec_time;
+	*max_dec_time      = group->max_dec_time;
+	*irap_avg_dec_time = group->irap_avg_dec_time;
+	*irap_max_dec_time = group->irap_max_dec_time;
+	*codec_reset       = group->codec_reset;
+	*decode_only_rap   = group->decode_only_rap;
+}
+
+//Romain: add to export.cpp
+GF_EXPORT
+GF_List* gf_dash_group_get_representations(const GF_DASH_Group *group, u32 *active_rep_index) {
+	if (active_rep_index) *active_rep_index = group->active_rep_index;
+	return group->adaptation_set->representations;
+}
+
+//Romain: add to export.cpp
+GF_EXPORT
+GF_DASH_Group* gf_dash_group_depend_on_group(const GF_DASH_Group *group) {
+	return group->depend_on_group;
+}
+
+//Romain: add to export.cpp
+GF_EXPORT
+Double gf_dash_group_get_speed(const GF_DASH_Group *group) 
+{
+	return group->dash->speed;
+}
+
+//Romain: add to export.cpp
+GF_EXPORT
+u32 gf_dash_group_get_min_rep_bitrate(const GF_DASH_Group *group) 
+{
+	return group->min_representation_bitrate;
+}
+
+//Romain: add to export.cpp
+GF_EXPORT
+u32 gf_dash_group_get_as_index_in_period(const GF_DASH_Group *group)
+{
+	return gf_list_find(group->period->adaptation_sets, group->adaptation_set);
+}
+
 struct _dash_srd_desc
 {
 	u32 srd_nb_rows, srd_nb_cols;
@@ -305,7 +378,6 @@ struct _dash_srd_desc
 };
 
 void drm_decrypt(unsigned char * data, unsigned long dataSize, const char * decryptMethod, const char * keyfileURL, const unsigned char * keyIV);
-
 
 
 static const char *gf_dash_get_mime_type(GF_MPD_SubRepresentation *subrep, GF_MPD_Representation *rep, GF_MPD_AdaptationSet *set)
@@ -2175,7 +2247,7 @@ exit:
 }
 
 
-static void gf_dash_set_group_representation(GF_DASH_Group *group, GF_MPD_Representation *rep)
+void gf_dash_set_group_representation(GF_DASH_Group *group, GF_MPD_Representation *rep)
 {
 #ifndef GPAC_DISABLE_LOG
 	u32 width=0, height=0, samplerate=0;
@@ -2200,11 +2272,11 @@ static void gf_dash_set_group_representation(GF_DASH_Group *group, GF_MPD_Repres
 	group->max_cached_segments = nb_cached_seg_per_rep * gf_dash_group_count_rep_needed(group);
 	nb_segs = group->nb_segments_in_rep;
 
-	group->min_bandwidth_selected = 1;
+	group->min_bandwidth_selected = GF_TRUE;
 	for (k=0; k<gf_list_count(group->adaptation_set->representations); k++) {
 		GF_MPD_Representation *arep = gf_list_get(group->adaptation_set->representations, k);
 		if (group->active_bitrate > arep->bandwidth) {
-			group->min_bandwidth_selected = 0;
+			group->min_bandwidth_selected = GF_FALSE;
 			break;
 		}
 	}
@@ -2421,8 +2493,10 @@ static void dash_store_stats(GF_DashClient *dash, GF_DASH_Group *group, GF_DASHF
 #endif
 }
 
-static void dash_do_rate_adaptation(GF_DashClient *dash, GF_DASH_Group *group)
+static void dash_do_rate_adaptation(GF_DASHFileIO *dashio, GF_DASH_Group *group)
 {
+	//Romain: duplicate dash_do_rate_adaptation
+	GF_DashClient *dash = group->dash;
 	Double speed;
 	u32 k, dl_rate;
 	Bool go_up_bitrate = GF_FALSE;
@@ -2901,7 +2975,7 @@ static GF_Err gf_dash_download_init_segment(GF_DashClient *dash, GF_DASH_Group *
 	/*if this was not an init segment, perform rate adaptation*/
 	if (nb_segment_read) {
 		dash_store_stats(dash, group, group->segment_download);
-		dash_do_rate_adaptation(dash, group);
+		dash->dash_io->do_rate_adaptation(dash->dash_io, group);
 	}
 
 	return GF_OK;
@@ -3777,6 +3851,7 @@ static u32 gf_dash_get_tiles_quality_rank(GF_DashClient *dash, GF_DASH_Group *ti
 	return 0;
 }
 
+//Romain: move to mpd_in
 //used upon startup of the session only
 static void gf_dash_set_tiles_quality(GF_DashClient *dash, struct _dash_srd_desc *srd)
 {
@@ -3785,7 +3860,7 @@ static void gf_dash_set_tiles_quality(GF_DashClient *dash, struct _dash_srd_desc
 
 	count = gf_list_count(dash->groups);
 	for (i=0; i<count; i++) {
-		GF_DASH_Group *group = gf_list_get(dash->groups, i);
+		GF_DASH_Group *group = (GF_DASH_Group*)gf_list_get(dash->groups, i);
 		u32 lower_quality;
 		if (group->srd_desc != srd) continue;
 
@@ -4793,7 +4868,7 @@ static void dash_global_rate_adaptation(GF_DashClient *dash)
 			assert(groups_per_quality[quality_rank]);
 			group->bytes_per_sec = bandwidths[quality_rank] / groups_per_quality[quality_rank];
 		}
-		dash_do_rate_adaptation(dash, group);
+		dash->dash_io->do_rate_adaptation(dash->dash_io, group);
 		group->bytes_per_sec = 0;
 	}
 }
@@ -6722,12 +6797,20 @@ u32 gf_dash_group_get_audio_channels(GF_DashClient *dash, u32 idx)
 	return 0;
 }
 
+//Romain: export.cpp
+//Romain: identical to next function
+GF_EXPORT
+u32 gf_dash_group_get_num_reps(const GF_DASH_Group *group)
+{
+	if (!group) return 0;
+	return gf_list_count(group->adaptation_set->representations);
+}
+
 GF_EXPORT
 u32 gf_dash_group_get_num_qualities(GF_DashClient *dash, u32 idx)
 {
 	GF_DASH_Group *group = gf_list_get(dash->groups, idx);
-	if (!group) return 0;
-	return gf_list_count(group->adaptation_set->representations);
+	return gf_dash_group_get_num_reps(group);
 }
 
 GF_EXPORT
@@ -6905,6 +6988,13 @@ GF_EXPORT
 void gf_dash_disable_speed_adaptation(GF_DashClient *dash, Bool disable)
 {
 	dash->disable_speed_adaptation = disable;
+}
+
+//Romain: export.cpp
+GF_EXPORT
+Bool gf_dash_group_get_speed_adaptation(const GF_DASH_Group *group)
+{
+	return (dash->disable_speed_adaptation == GF_TRUE) ? GF_FALSE : GF_TRUE;
 }
 
 GF_EXPORT

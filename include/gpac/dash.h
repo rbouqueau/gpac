@@ -32,6 +32,7 @@ extern "C" {
 #endif
 
 #include <gpac/tools.h>
+#include <gpac/list.h>
 
 #ifndef GPAC_DISABLE_DASH_CLIENT
 
@@ -74,6 +75,9 @@ typedef enum
 	GF_DASH_EVENT_CODEC_STAT_QUERY,
 } GF_DASHEventType;
 
+typedef struct __dash_client GF_DashClient;
+typedef struct __dash_group GF_DASH_Group;
+
 /*structure used for all IO operations for DASH*/
 typedef struct _gf_dash_io GF_DASHFileIO;
 typedef void *GF_DASHFileIOSession;
@@ -85,6 +89,9 @@ struct _gf_dash_io
 
 	/*signals errors or specific actions to perform*/
 	GF_Err (*on_dash_event)(GF_DASHFileIO *dashio, GF_DASHEventType evt, s32 group_idx, GF_Err setup_error);
+
+	/*rate adaptation algorithm*/
+	void (*do_rate_adaptation)(GF_DASHFileIO *dashio, GF_DASH_Group *group);
 
 	/*used to check whether a representation is supported or not. Function returns 1 if supported, 0 otherwise
 	if this callback is not set, the representation is assumed to be supported*/
@@ -127,8 +134,7 @@ struct _gf_dash_io
 	u32 (*get_bytes_done)(GF_DASHFileIO *dashio, GF_DASHFileIOSession session);
 };
 
-typedef struct __dash_client GF_DashClient;
-
+//Romain: move to mpd_in
 typedef enum
 {
 	//selects the lowest quality when starting - if one of the representation does not have video (HLS), it may be selected
@@ -378,6 +384,8 @@ u32 gf_dash_get_period_duration(GF_DashClient *dash);
 //returns number of quality available for the given group
 u32 gf_dash_group_get_num_qualities(GF_DashClient *dash, u32 idx);
 
+//Romain
+Bool gf_dash_group_get_speed_adaptation(const GF_DASH_Group *group);
 void gf_dash_disable_speed_adaptation(GF_DashClient *dash, Bool disable);
 
 
@@ -411,8 +419,22 @@ GF_Err gf_dash_set_automatic_switching(GF_DashClient *dash, Bool enable_switchin
 //selects quality of given ID
 GF_Err gf_dash_group_select_quality(GF_DashClient *dash, u32 idx, const char *ID);
 
-//gets download rate in bytes per second for the given group
+//gets download rate in bytes per second for the given group - retrived from DASH/IO
 u32 gf_dash_group_get_download_rate(GF_DashClient *dash, u32 idx);
+
+//Romain
+//accessors for stats stored in GF_DASH_Group
+void gf_dash_group_get_last_segment_stats(const GF_DASH_Group *group, u32 *total_size, u32 *bytes_per_sec, u64 *current_downloaded_segment_duration);
+void gf_dash_group_codec_stats(const GF_DASH_Group *group, u32 *avg_dec_time, u32 *max_dec_time, u32 *irap_avg_dec_time, u32 *irap_max_dec_time, Bool *codec_reset, Bool *decode_only_rap);
+void gf_dash_group_get_buffer_stats(const GF_DASH_Group *group, u32 *buffer_min_ms, u32 *buffer_max_ms, u32 *buffer_occupancy_ms, u32 *buffer_occupancy_at_last_seg);
+GF_List* gf_dash_group_get_representations(const GF_DASH_Group *group, u32 *active_rep_index);
+GF_DASH_Group* gf_dash_group_depend_on_group(const GF_DASH_Group *group);
+Double gf_dash_group_get_speed(const GF_DASH_Group *group);
+void gf_dash_group_reset_and_query_stats(GF_DASH_Group *group);
+u32 gf_dash_group_get_min_rep_bitrate(const GF_DASH_Group *group);
+u32 gf_dash_group_get_as_index_in_period(const GF_DASH_Group *group);
+u32 gf_dash_group_get_num_reps(const GF_DASH_Group *group);
+//Romain: void gf_dash_set_group_representation(GF_DASH_Group *group, GF_MPD_Representation *rep);
 
 //forces NTP of the DASH client to be the given NTP
 void gf_dash_override_ntp(GF_DashClient *dash, u64 server_ntp);
