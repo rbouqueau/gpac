@@ -1,6 +1,11 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
+<<<<<<< Updated upstream
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
+=======
+# Visual Studio 15
+VisualStudioVersion = 15.0.26430.14
+>>>>>>> Stashed changes
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mp4client", "mp4client.vcxproj", "{A35D99BF-D72D-4F56-99A1-97249B22BCE2}"
 EndProject
@@ -109,7 +114,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nvdec", "nvdec.vcxproj", "{
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dektec_out", "dektec_out.vcxproj", "{CAC981C2-5665-4E90-80D3-604C1A785D91}"
 EndProject
+<<<<<<< Updated upstream
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atsc_in", "atsc_in.vcxproj", "{48071212-239F-4F24-B4FA-E21250CCB087}"
+=======
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dashmuxts", "..\..\applications\dashmuxts\dashmuxts.vcxproj", "{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}"
+>>>>>>> Stashed changes
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -715,6 +724,7 @@ Global
 		{CAC981C2-5665-4E90-80D3-604C1A785D91}.Release|Win32.Build.0 = Release|Win32
 		{CAC981C2-5665-4E90-80D3-604C1A785D91}.Release|x64.ActiveCfg = Release|x64
 		{CAC981C2-5665-4E90-80D3-604C1A785D91}.Release|x64.Build.0 = Release|x64
+<<<<<<< Updated upstream
 		{48071212-239F-4F24-B4FA-E21250CCB087}.Debug - MP4Box_only|Win32.ActiveCfg = Debug|Win32
 		{48071212-239F-4F24-B4FA-E21250CCB087}.Debug - MP4Box_only|Win32.Build.0 = Debug|Win32
 		{48071212-239F-4F24-B4FA-E21250CCB087}.Debug - MP4Box_only|x64.ActiveCfg = Debug|x64
@@ -731,6 +741,22 @@ Global
 		{48071212-239F-4F24-B4FA-E21250CCB087}.Release|Win32.Build.0 = Release|Win32
 		{48071212-239F-4F24-B4FA-E21250CCB087}.Release|x64.ActiveCfg = Release|x64
 		{48071212-239F-4F24-B4FA-E21250CCB087}.Release|x64.Build.0 = Release|x64
+=======
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Debug - MP4Box_only|Win32.ActiveCfg = Debug|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Debug - MP4Box_only|Win32.Build.0 = Debug|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Debug - MP4Box_only|x64.ActiveCfg = Release|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Debug - MP4Box_only|x64.Build.0 = Release|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Debug|Win32.Build.0 = Debug|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Debug|x64.ActiveCfg = Debug|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Release - MP4Box_only|Win32.ActiveCfg = Release|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Release - MP4Box_only|Win32.Build.0 = Release|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Release - MP4Box_only|x64.ActiveCfg = Release|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Release - MP4Box_only|x64.Build.0 = Release|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Release|Win32.ActiveCfg = Release|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Release|Win32.Build.0 = Release|Win32
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0}.Release|x64.ActiveCfg = Release|Win32
+>>>>>>> Stashed changes
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -785,6 +811,10 @@ Global
 		{E578716F-6663-4D83-AC79-57EA00D2F406} = {6274F5D2-A9CB-4DF9-BF9E-818416ACD347}
 		{073E2381-4CDB-4C4D-B217-C489EF17C48B} = {6274F5D2-A9CB-4DF9-BF9E-818416ACD347}
 		{CAC981C2-5665-4E90-80D3-604C1A785D91} = {6274F5D2-A9CB-4DF9-BF9E-818416ACD347}
+<<<<<<< Updated upstream
 		{48071212-239F-4F24-B4FA-E21250CCB087} = {6274F5D2-A9CB-4DF9-BF9E-818416ACD347}
+=======
+		{F728CC84-A7D1-43D2-8A28-05CE9F2EF0D0} = {B7FFDE3D-6BF0-4EE1-B6FD-BD15A503DBBA}
+>>>>>>> Stashed changes
 	EndGlobalSection
 EndGlobal
