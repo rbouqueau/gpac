@@ -235,6 +235,9 @@ typedef struct
 	u32 sbr_object_type, sbr_sr, sbr_sr_index;
 	/*PS*/
 	Bool has_ps;
+	/*USAC and xHE-AAC*/
+	u8 roll_distance;
+	Bool preroll_element_flag;
 	/*PL indication*/
 	u8 audioPL;
 

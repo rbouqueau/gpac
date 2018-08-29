@@ -643,13 +643,26 @@ typedef struct
 	u32 profile, sr_idx, nb_ch, frame_size;
 } ADTSHeader;
 
-static SAPType xHEAAC_isRAP(u32 profile, char *data, u32 dataLength)
+extern u64 xHEAAC_escapedValue(GF_BitStream *bs, u8 nBits1, u8 nBits2, u8 nBits3);
+static SAPType xHEAAC_isRAP(u32 profile, Bool has_preroll, char *data, u32 dataLength, u8 *numPreRollFrames)
 {
 	if (profile == 42) { /*xHE-AAC*/
-		if (dataLength > 0 && (data[0] & 0x80))
+		if (dataLength > 0 && (data[0] & 0x80)) {
+			if (has_preroll) { /*AudioPreRoll()*/
+				GF_BitStream *bs = gf_bs_new(data, dataLength, GF_BITSTREAM_READ);
+				u64 configLen = xHEAAC_escapedValue(bs, 4, 4, 8);
+				gf_bs_skip_bytes(bs, configLen);
+				gf_bs_read_int(bs, 1); /*applyCrossfade*/
+				gf_bs_read_int(bs, 1); /*reserved*/
+
+				*numPreRollFrames = (u8)xHEAAC_escapedValue(bs, 2, 4, 0); //Romain: should be equal to prev one!!!
+				gf_bs_del(bs);
+			}
+
 			return RAP;
-		else
+		} else {
 			return RAP_NO;
+		}
 	}
 
 	return RAP;
@@ -855,6 +868,80 @@ GF_Err gf_import_aac_loas(GF_MediaImporter *import)
 		import->flags &= ~GF_IMPORT_SBR_IMPLICIT;
 	}
 
+
+
+#if 0 //Romain
+
+	The DSI is not the same
+
+	=====
+
+	UsacFrame()
+	{
+		usacIndependencyFlag;	1	uimsbf
+
+			====
+
+			usacExtElementType = > ID_EXT_ELE_AUDIOPREROLL
+			    => "A UsacExtElement() with the usacExtElementType of ID_EXT_ELE_AUDIOPREROLL shall be used to transmit the AudioPreRoll()."
+			=> defined in UsacExtElementConfig()
+			=> defined in UsacDecoderConfig()
+			=> defined in UsacConfig()
+			=> defined in AudioSpecificConfig() (AAC):
+			   AudioSpecificConfig() extends the abstract class DecoderSpecificInfo
+
+			==== =
+
+			—	The pre - roll frames with index “0” shall be independently decodable, i.e.usacIndependencyFlag shall be set to “1”.
+
+	==== =
+
+		Random access and immediate play - out is possible at every frame that utilizes the AudioPreRoll() structure as specified in this subclause.The following pseudo - code describes the decoding process :
+		if (usacIndependencyFlag == 1) {
+			if (usacExtElementPresent == 1) {
+
+				/* In this case usacExtElementUseDefaultLength must be 0! */
+				if (usacExtElementUseDefaultLength != 0) goto error;
+
+				/* Not used */
+				getUsacExtElementPayloadLength();
+
+				/* Check for presence of config and re-initialize if necessary */
+				int configLen = getConfigLen();
+				if (configLen > 0) {
+					config c = getConfig(configLen);
+					ReConfigureDecoder(c);
+				}
+
+				/* Get pre-roll AUs and decode, discard output samples */
+				int numPreRollFrames = getNumPreRollFrames();
+				for (auIdx = 0; auIdx < numPreRollFrames; auIdx++) {
+					int auLen = getAuLen();
+					AU nextAU = getPreRollAU(auLen);
+					DecodeAU(nextAU);
+				}
+			}
+		}
+
+		=====
+
+		AudioPreRoll()
+		{
+			configLen = escapedValue(4, 4, 8);
+			Config()
+
+				applyCrossfade;
+			reserved;
+
+			numPreRollFrames = escapedValue(2, 4, 0);
+
+			for (frameIdx = 0; frameIdx < numPreRollFrames; ++frameIdx) {
+				auLen = escapedValued(16, 16, 0)
+					AccessUnit()
+			}
+		}
+#endif
+
 	dts_inc = 1024;
 
 	destroy_esd = GF_FALSE;
@@ -891,7 +978,7 @@ GF_Err gf_import_aac_loas(GF_MediaImporter *import)
 	samp = gf_isom_sample_new();
 	samp->dataLength = nbbytes;
 	samp->data = (char *) aac_buf;
-	samp->IsRAP = xHEAAC_isRAP(acfg.base_object_type, samp->data, samp->dataLength);
+	samp->IsRAP = xHEAAC_isRAP(acfg.base_object_type, acfg.preroll_element_flag, samp->data, samp->dataLength, &acfg.roll_distance);
 
 	e = gf_isom_add_sample(import->dest, track, di, samp);
 	if (e) goto exit;
@@ -909,7 +996,7 @@ GF_Err gf_import_aac_loas(GF_MediaImporter *import)
 
 		samp->data = (char*)aac_buf;
 		samp->dataLength = nbbytes;
-		samp->IsRAP = xHEAAC_isRAP(base_object_type, samp->data, samp->dataLength);
+		samp->IsRAP = xHEAAC_isRAP(base_object_type, acfg.preroll_element_flag, samp->data, samp->dataLength, &acfg.roll_distance);
 
 		e = gf_isom_add_sample(import->dest, track, di, samp);
 		if (e) break;

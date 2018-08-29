@@ -1163,11 +1163,24 @@ u32 gf_m4a_get_profile(GF_M4ADecSpecInfo *cfg)
 }
 
 
+u64 xHEAAC_escapedValue(GF_BitStream *bs, u8 nBits1, u8 nBits2, u8 nBits3) {
+	u64 value = gf_bs_read_int(bs, nBits1);
+	if (value == (1 << nBits1) - 1) {
+		u64 value2 = gf_bs_read_int(bs, nBits2);
+		value += value2;
+		if (value2 == (1 << nBits2) - 1) {
+			value += gf_bs_read_int(bs, nBits3);
+		}
+	}
+	return value;
+
+}
 
 GF_EXPORT
 GF_Err gf_m4a_parse_config(GF_BitStream *bs, GF_M4ADecSpecInfo *cfg, Bool size_known)
 {
 	u32 channel_configuration = 0;
+	u64 bs_pos = gf_bs_get_position(bs);
 	memset(cfg, 0, sizeof(GF_M4ADecSpecInfo));
 	cfg->base_object_type = gf_bs_read_int(bs, 5);
 	/*extended object type*/
@@ -1301,7 +1314,46 @@ GF_Err gf_m4a_parse_config(GF_BitStream *bs, GF_M4ADecSpecInfo *cfg, Bool size_k
 		}
 	}
 	break;
+	case 42: /*xHE-AAC*/
+	{
+		u8 coreSbrFrameLengthIndex;
+		if (gf_bs_read_int(bs, 5)/*usacSamplingFrequencyIndex*/ == 0x1f) {
+			gf_bs_read_int(bs, 24); /*usacSamplingFrequency*/
+		}
+		coreSbrFrameLengthIndex = gf_bs_read_int(bs, 3);
+		if (coreSbrFrameLengthIndex < 2) {
+			cfg->roll_distance = 1;
+		} else {
+			cfg->roll_distance = 3; /*could be 2 or 3 depending on harmonicSBR flag (off=2, on=3)*/
+		}
+
+		/*UsacChannelConfig*/
+		if (gf_bs_read_int(bs, 5)/*channelConfigurationIndex*/ == 0) {
+			xHEAAC_escapedValue(bs, 5, 8, 16);
+		}
+
+		/*UsacDecoderConfig()*/
+		xHEAAC_escapedValue(bs, 4, 8, 16); /*numElements = xHEAAC_escapedValue(bs, 4, 8, 16) + 1;*/
+		if (gf_bs_read_int(bs, 2) == 3/*ID_EXT_ELE_AUDIOPREROLL*/) {
+			cfg->preroll_element_flag = GF_TRUE;
+		} else {
+			cfg->preroll_element_flag = GF_FALSE;
+		}
+
+		//UsacConfigExtension not parsed
+
+		{
+			//Romain: we need to ârse it all to extract the size :/
+			u64 romain = gf_bs_get_position(bs);
+			gf_bs_seek(bs, bs_pos);
+			char *data = gf_malloc(romain - bs_pos + 1);
+			gf_bs_read_data(bs, data, romain - bs_pos + 1);
+			romain = 5;
+		}
+		goto exit;
+	} break;
 	}
+
 	/*ER cfg*/
 	switch (cfg->base_object_type) {
 	case 17:
@@ -1350,6 +1402,8 @@ GF_Err gf_m4a_parse_config(GF_BitStream *bs, GF_M4ADecSpecInfo *cfg, Bool size_k
 			}
 		}
 	}
+
+exit:
 	cfg->audioPL = gf_m4a_get_profile(cfg);
 	return GF_OK;
 }
@@ -1515,6 +1569,83 @@ GF_Err gf_m4a_write_config_bs(GF_BitStream *bs, GF_M4ADecSpecInfo *cfg)
 		}
 	}
 	break;
+	case 42: //Romain: extend to all USAC AOT => we should copy it from the input?
+#if 0
+		usacSamplingFrequencyIndex gf_bs_write_int(bs, cfg->usacSamplingFrequencyIndex, 5);
+		if (usacSamplingFrequencyIndex == 0x1f) {
+			gf_bs_write_int(bs, usacSamplingFrequency, 24);
+		}
+		coreSbrFrameLengthIndex gf_bs_write_int(bs, coreSbrFrameLengthIndex, 3);
+		channelConfigurationIndex gf_bs_write_int(bs, channelConfigurationIndex, 5);
+		if (channelConfigurationIndex == 0) {
+			/*UsacChannelConfig*/
+			numOutChannels = escapedValue(5, 8, 16);
+			for (i = 0; i<numOutChannels; i++) {
+				bsOutputChannelPos[i];
+			}
+		}
+
+		/*UsacDecoderConfig*/
+		numElements = escapedValue(4, 8, 16) + 1;
+		for (elemIdx = 0; elemIdx<numElements; ++elemIdx) {
+			gf_bs_write_int(bs, usacElementType[elemIdx], 2);
+			switch (usacElementType[elemIdx]) {
+			case 0: /*ID_USAC_SCE*/
+			case 1: /*ID_USAC_CPE*/
+			case 2: /*ID_USAC_LFE*/
+				assert(0);
+				break;
+			case 3: /*ID_USAC_EXT*/
+				/*UsacExtElementConfig*/
+				usacExtElementType = escapedValue(4, 8, 16);
+				usacExtElementConfigLength = escapedValue(4, 8, 16);
+
+				gf_bs_write_int(bs, usacExtElementDefaultLengthPresent, 1);
+				if (usacExtElementDefaultLengthPresent) {
+					usacExtElementDefaultLength = escapedValue(8, 16, 0) + 1;
+				}
+				else {
+					usacExtElementDefaultLength = 0;
+				}
+
+				gf_bs_write_int(bs, usacExtElementPayloadFrag, 1);
+				switch (usacExtElementType) {
+				case 0: /*ID_EXT_ELE_FILL*/
+					break;
+				case 1: /*ID_EXT_ELE_MPEGS*/
+					SpatialSpecificConfig();
+					break;
+				case 2: /*ID_EXT_ELE_SAOC*/
+					SaocSpecificConfig();
+					break;
+				case 3: /*ID_EXT_ELE_AUDIOPREROLL*/
+					/* No configuration element */ => Romain
+					break;
+				case 4: /*ID_EXT_ELE_UNI_DRC*/
+					uniDrcConfig();
+					break;
+				default:
+					while (usacExtElementConfigLength--) {
+						gf_bs_write_int(bs, tmp, 8);
+					}
+					break;
+				}
+}
+
+				break;
+			}
+		}
+
+		assert(0); //Romain: not handled
+		gf_bs_write_int(bs, usacConfigExtensionPresent, 1);
+		if (usacConfigExtensionPresent == 1) {
+			UsacConfigExtension();
+		}
+#else
+		//Romain: let's copy it from the input
+		assert(0);
+#endif
+		return GF_OK;
 	}
 	/*ER cfg - not supported*/
 
