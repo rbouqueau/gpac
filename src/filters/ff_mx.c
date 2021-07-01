@@ -308,7 +308,6 @@ static GF_Err ffmx_start_seg(GF_Filter *filter, GF_FFMuxCtx *ctx, const char *se
 			}
 			st->sample_aspect_ratio = ctx->muxer->streams[i]->sample_aspect_ratio;
 			st->time_base = ctx->muxer->streams[i]->time_base;
-			printf("Romain ffmx: st->time_base erased to %d/%d\n", st->time_base.num, st->time_base.den);
 			st->avg_frame_rate = ctx->muxer->streams[i]->avg_frame_rate;
 
 #if (LIBAVFORMAT_VERSION_MAJOR < 59)
@@ -546,8 +545,6 @@ static GF_Err ffmx_process(GF_Filter *filter)
 			pkt->dts = gf_filter_pck_get_dts(ipck);
 			pkt->pts = gf_filter_pck_get_cts(ipck);
 			if (st->cts_shift) pkt->pts += st->cts_shift;
-			//printf("Romain FFmx[%d]: dts=%llu cts_shift=%u st->in_scale=%d/%d st->stream->time_base=%d/%d (avst=%p)\n",
-			//	pkt->stream_index, pkt->dts, st->cts_shift, (int)st->in_scale.num, (int)st->in_scale.den, st->stream->time_base.num, st->stream->time_base.den, st->stream);
 
 			if (pkt->dts > pkt->pts) {
 				st->cts_shift = (u32) (pkt->dts - pkt->pts);
@@ -559,18 +556,9 @@ static GF_Err ffmx_process(GF_Filter *filter)
 			if (sap==GF_FILTER_SAP_1) pkt->flags = AV_PKT_FLAG_KEY;
 			pkt->data = (u8 *) gf_filter_pck_get_data(ipck, &pkt->size);
 
-			if (GF_TRUE/*Romain*/ || st->ts_rescale) {
-				av_packet_rescale_ts(pkt, st->in_scale, st->stream->time_base);
-			}
+			//always rescale in case the time_base changes following a reconfiguration
+			av_packet_rescale_ts(pkt, st->in_scale, st->stream->time_base);
 
-			{
-				char strr[1024];
-				int ;
-				for (i=0;i<pkt->stream_index*8;++i)
-					strr[i] = ' ';
-				strr[i] = 0;
-				//printf("%sRomain [%d]: %lld\n", strr, pkt->stream_index, pkt->dts);
-			}
 			if (ctx->interleave) {
 				res = av_interleaved_write_frame(ctx->muxer, pkt);
 			} else {
@@ -803,7 +791,7 @@ static GF_Err ffmx_configure_pid(GF_Filter *filter, GF_FilterPid *pid, Bool is_r
 
 	p = gf_filter_pid_get_property(pid, GF_PROP_PID_TIMESCALE);
 	if (p) {
-		printf("Romain ffmx: reconfigure timescale = %d (avst=%p)\n", p ? (int)p->value.uint : 0, avst);
+		//don't reconfigure if already set: this is not supported
 		if (avst->time_base.den == 0) {
 			avst->time_base.den = p->value.uint;
 			avst->time_base.num = 1;

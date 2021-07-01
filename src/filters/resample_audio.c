@@ -202,7 +202,10 @@ static GF_Err resample_configure_pid(GF_Filter *filter, GF_FilterPid *pid, Bool 
 	p = gf_filter_pid_get_property(pid, GF_PROP_PID_CHANNEL_LAYOUT);
 	if (p) ch_cfg = p->value.longuint;
 	if (!ch_cfg) ch_cfg = (nb_ch==1) ? GF_AUDIO_CH_FRONT_CENTER : (GF_AUDIO_CH_FRONT_LEFT|GF_AUDIO_CH_FRONT_RIGHT);
-	ch_cfg = GF_AUDIO_CH_FRONT_LEFT|GF_AUDIO_CH_FRONT_RIGHT; //Romain
+
+	//if we don't put a layout, when changing the channel number, the downstream encoder will raise an error: we
+	//shoud have default layouts for each number of channels + make channel layout a parameter of this filter
+	ch_cfg = GF_AUDIO_CH_FRONT_LEFT|GF_AUDIO_CH_FRONT_RIGHT;
 
 	ctx->timescale = sr;
 	p = gf_filter_pid_get_property(pid, GF_PROP_PID_TIMESCALE);

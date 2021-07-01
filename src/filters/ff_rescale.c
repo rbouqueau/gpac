@@ -108,13 +108,6 @@ static GF_Err ffsws_process(GF_Filter *filter)
 	if (!dst_pck) return GF_OUT_OF_MEM;
 
 	gf_filter_pck_merge_properties(pck, dst_pck);
-	if (0) {
-		u64 cts = gf_filter_pck_get_cts(pck);
-		u64 dts = gf_filter_pck_get_dts(pck);
-		u64 dst_cts = gf_filter_pck_get_cts(dst_pck);
-		u64 dst_dts = gf_filter_pck_get_dts(dst_pck);
-		printf("        Romain1: %llu/%llu  ->  %llu/%llu\n", dts, cts, dst_dts, dst_cts);
-	}
 
 	if (data) {
 		src_planes[0] = (u8 *) data;
@@ -176,13 +169,6 @@ static GF_Err ffsws_process(GF_Filter *filter)
 		}
 	}
 
-	if (0) {
-		u64 cts = gf_filter_pck_get_cts(pck);
-		u64 dts = gf_filter_pck_get_dts(pck);
-		u64 dst_cts = gf_filter_pck_get_cts(dst_pck);
-		u64 dst_dts = gf_filter_pck_get_dts(dst_pck);
-		printf("        Romain2: %llu/%llu  ->  %llu/%llu\n", dts, cts, dst_dts, dst_cts);
-	}
 	gf_filter_pck_send(dst_pck);
 	gf_filter_pid_drop_packet(ctx->ipid);
 	return GF_OK;

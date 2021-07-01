@@ -262,16 +262,8 @@ static void ffenc_copy_pid_props(GF_FFEncodeCtx *ctx)
 static u64 ffenc_get_cts(GF_FFEncodeCtx *ctx, GF_FilterPacket *pck)
 {
 	u64 cts = gf_filter_pck_get_cts(pck);
-	if (0) {
-		u32 tss = gf_filter_pck_get_timescale(pck);
-		printf("          Romain: %llu / %u\n", cts, tss);
-	}
 	if ((ctx->in_tk_delay<0) && (cts < (u64) -ctx->in_tk_delay)) {
 		GF_LOG(GF_LOG_WARNING, GF_LOG_CODEC, ("[FFEnc] Negative input timestamp (cts="LLU" media delay="LLD")\n", cts, ctx->in_tk_delay));
-		if (0) {
-			u32 tss = gf_filter_pck_get_timescale(pck);
-			printf("          Romain(2): %llu / %u\n", cts, tss);
-		}
 		return 0;
 	}
 	return cts + ctx->in_tk_delay;
@@ -519,37 +511,32 @@ static GF_Err ffenc_process_video(GF_Filter *filter, struct _gf_ffenc_ctx *ctx)
 
 #if (LIBAVFORMAT_VERSION_MAJOR<59)
 		ctx->frame->pkt_dts = ctx->frame->pkt_pts = ctx->frame->pts;
-		//printf("     Romain: input enc dts=%lld . (ctx->timescale=%u, pck_ts=%u)\n", ctx->frame->pkt_dts, ctx->timescale, gf_filter_pck_get_timescale(pck));
 		static int64_t last_dts = INT64_MIN;
-		if (last_dts >= ctx->frame->pkt_dts) {
-			printf("     Romain: enc dts=%lld ============= DROP ==============\n", ctx->frame->pkt_dts);
+		if (last_dts >= ctx->frame->pkt_dts)
 			ctx->frame->pkt_dts = ctx->frame->pkt_pts = ctx->frame->pts = last_dts + 1;
-		} /*else*/ {
-			last_dts = ctx->frame->pkt_dts;
-			res = avcodec_encode_video2(ctx->encoder, pkt, ctx->frame, &gotpck);
-		} //Romain
+
+		last_dts = ctx->frame->pkt_dts;
+		res = avcodec_encode_video2(ctx->encoder, pkt, ctx->frame, &gotpck);
 		ctx->nb_frames_in++;
 #else
 		ctx->frame->pkt_dts = ctx->frame->pts;
-		//printf("     Romain: enc dts=%lld\n", ctx->frame->pkt_dts);
+
 		static int64_t last_dts = INT64_MIN;
-		if (last_dts >= ctx->frame->pkt_dts) {
-			printf("     Romain: enc dts=%lld ============= DROP ==============\n", ctx->frame->pkt_dts);
+		if (last_dts >= ctx->frame->pkt_dts)
 			ctx->frame->pkt_dts = ctx->frame->pts = last_dts + 1;
-		} /*else*/ {
-			last_dts = ctx->frame->pkt_dts;
-			res = avcodec_send_frame(ctx->encoder, ctx->frame);
-			switch (res) {
-			case AVERROR(EAGAIN):
-				return GF_OK;
-			case 0:
-				break;
-			case AVERROR_EOF:
-				break;
-			default:
-				GF_LOG(GF_LOG_ERROR, GF_LOG_CODEC, ("[FFEnc] PID %s failed to encode frame PTS "LLU": %s\n", gf_filter_pid_get_name(ctx->in_pid), pkt->pts, av_err2str(res) ));
-				break;
-			}
+
+		last_dts = ctx->frame->pkt_dts;
+		res = avcodec_send_frame(ctx->encoder, ctx->frame);
+		switch (res) {
+		case AVERROR(EAGAIN):
+			return GF_OK;
+		case 0:
+			break;
+		case AVERROR_EOF:
+			break;
+		default:
+			GF_LOG(GF_LOG_ERROR, GF_LOG_CODEC, ("[FFEnc] PID %s failed to encode frame PTS "LLU": %s\n", gf_filter_pid_get_name(ctx->in_pid), pkt->pts, av_err2str(res) ));
+			break;
 		}
 		ctx->nb_frames_in++;
 		gotpck = 0;
@@ -788,11 +775,6 @@ static GF_Err ffenc_process_video(GF_Filter *filter, struct _gf_ffenc_ctx *ctx)
 		gf_filter_pck_set_dependency_flags(dst_pck, 0x8);
 	}
 #endif
-
-
-	//printf("     Romain: output enc dts=%lld\n", pkt->dts);
-	//printf("     Romain: output enc dts=%lld (shift=%lld)\n", pkt->dts, ctx->ts_shift);
-	//printf("     Romain: output enc dts=%lld (shift=%lld) . (pck_ts=%u)\n", pkt->dts, ctx->ts_shift, gf_filter_pck_get_timescale(dst_pck));
 
 	gf_filter_pck_send(dst_pck);
 
@@ -1584,7 +1566,6 @@ static GF_Err ffenc_configure_pid_ex(GF_Filter *filter, GF_FilterPid *pid, Bool 
 			ctx->encoder->time_base.num = prop->value.frac.den;
 			ctx->encoder->time_base.den = prop->value.frac.num;
 		}
-		printf("== Romain ffenc: timescale=%d time_base=%d/%d===================================================\n", prop==NULL, ctx->timescale, ctx->encoder->time_base.num, ctx->encoder->time_base.den);
 
 		gf_media_get_reduced_frame_rate(&ctx->encoder->time_base.den, &ctx->encoder->time_base.num);
 		ctx->encoder->ticks_per_frame = ctx->encoder->time_base.num;
