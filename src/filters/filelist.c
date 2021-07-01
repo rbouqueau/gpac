@@ -1129,7 +1129,7 @@ static GF_Err filelist_load_next(GF_Filter *filter, GF_FileListCtx *ctx)
 		}
 	}
 
-	//lock all filters while loading up chain, to avoid PID init from other threads to resolve agains this filter
+	//lock all filters while loading up chain, to avoid PID init from other threads to resolve again this filter
 	//while we setup sourceID
 	gf_filter_lock_all(filter, GF_TRUE);
 	//reset all our source_ids
@@ -1851,12 +1851,18 @@ static GF_Err filelist_process(GF_Filter *filter)
 			if (dts==GF_FILTER_NO_TS)
 				dts = 0;
 
+			if (0)
+				printf("Romain[%d] %lf\n", (int)i, dts/(double)gf_filter_pck_get_timescale(pck));
+
 			//make sure we start all streams on a SAP
+#if 0
 			if (!iopid->wait_rap && gf_filter_pck_get_seek_flag(pck)) {
 				gf_filter_pid_drop_packet(iopid->ipid);
 				pck = NULL;
 			}
-			else if (iopid->wait_rap && !iopid->ra_info.is_raw && !gf_filter_pck_get_sap(pck)) {
+			else
+#endif
+			if (iopid->wait_rap && !iopid->ra_info.is_raw && !gf_filter_pck_get_sap(pck)) {
 				gf_filter_pid_drop_packet(iopid->ipid);
 				pck = NULL;
 			}
@@ -2121,11 +2127,18 @@ static GF_Err filelist_process(GF_Filter *filter)
 				break;
 			}
 
+			if (0) {
+				u64 cts = gf_filter_pck_get_cts(pck);
+				u64 dts = gf_filter_pck_get_dts(pck);
+				printf("    PL: %llu/%llu  ->  %llu/%llu\n", dts, cts);
+				printf("Romain: exiting\n");
+				exit(1);
+			}
 			filein_send_packet(ctx, iopid, pck, GF_FALSE);
 
 			//if we have an end range, compute max_dts (includes dur) - first_dts
 			if (ctx->stop > ctx->start) {
-				if ( (ctx->stop-ctx->start) * iopid->timescale <= (iopid->max_dts - iopid->first_dts_plus_one + 1)) {
+				if ( (ctx->stop - ctx->start) * iopid->timescale <= (iopid->max_dts - iopid->first_dts_plus_one + 1)) {
 					GF_FilterEvent evt;
 					GF_FEVT_INIT(evt, GF_FEVT_STOP, iopid->ipid)
 					gf_filter_pid_send_event(iopid->ipid, &evt);

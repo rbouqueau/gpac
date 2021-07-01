@@ -95,7 +95,7 @@ static GF_Err ffsws_process(GF_Filter *filter)
 
 	data = gf_filter_pck_get_data(pck, &osize);
 	frame_ifce = gf_filter_pck_get_frame_interface(pck);
-	//we may have biffer input (padding) but shall not have smaller
+	//we may have buffer input (padding) but shall not have smaller
 	if (osize && (ctx->out_src_size > osize) ) {
 		GF_LOG(GF_LOG_ERROR, GF_LOG_MEDIA, ("[FFSWS] Mismatched in source osize, expected %d got %d - stride issue ?\n", ctx->out_src_size, osize));
 		gf_filter_pid_drop_packet(ctx->ipid);
@@ -108,6 +108,13 @@ static GF_Err ffsws_process(GF_Filter *filter)
 	if (!dst_pck) return GF_OUT_OF_MEM;
 
 	gf_filter_pck_merge_properties(pck, dst_pck);
+	if (0) {
+		u64 cts = gf_filter_pck_get_cts(pck);
+		u64 dts = gf_filter_pck_get_dts(pck);
+		u64 dst_cts = gf_filter_pck_get_cts(dst_pck);
+		u64 dst_dts = gf_filter_pck_get_dts(dst_pck);
+		printf("        Romain1: %llu/%llu  ->  %llu/%llu\n", dts, cts, dst_dts, dst_cts);
+	}
 
 	if (data) {
 		src_planes[0] = (u8 *) data;
@@ -169,6 +176,13 @@ static GF_Err ffsws_process(GF_Filter *filter)
 		}
 	}
 
+	if (0) {
+		u64 cts = gf_filter_pck_get_cts(pck);
+		u64 dts = gf_filter_pck_get_dts(pck);
+		u64 dst_cts = gf_filter_pck_get_cts(dst_pck);
+		u64 dst_dts = gf_filter_pck_get_dts(dst_pck);
+		printf("        Romain2: %llu/%llu  ->  %llu/%llu\n", dts, cts, dst_dts, dst_cts);
+	}
 	gf_filter_pck_send(dst_pck);
 	gf_filter_pid_drop_packet(ctx->ipid);
 	return GF_OK;
