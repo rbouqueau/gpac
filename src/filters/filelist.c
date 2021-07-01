@@ -408,7 +408,10 @@ static GF_Err filelist_configure_pid(GF_Filter *filter, GF_FilterPid *pid, Bool 
 		if (ctx->timescale) iopid->o_timescale = ctx->timescale;
 		else {
 			iopid->o_timescale = gf_filter_pid_get_timescale(pid);
-			if (!iopid->o_timescale) iopid->o_timescale = 1000;
+			if (!iopid->o_timescale)  { 
+		printf("Romain: default timescale 1000 (1). Exiting.");
+		exit(1);iopid->o_timescale = 1000;
+			}
 		}
 		gf_list_add(ctx->io_pids, iopid);
 		iopid->send_cue = ctx->sigcues;
@@ -475,7 +478,11 @@ static GF_Err filelist_configure_pid(GF_Filter *filter, GF_FilterPid *pid, Bool 
 	p = gf_filter_pid_get_property(pid, GF_PROP_PID_NB_FRAMES);
 	iopid->single_frame = (p && (p->value.uint==1)) ? GF_TRUE : GF_FALSE ;
 	iopid->timescale = gf_filter_pid_get_timescale(pid);
-	if (!iopid->timescale) iopid->timescale = 1000;
+	if (!iopid->timescale) { 
+		printf("Romain: default timescale 1000 (3). Exiting.");
+		exit(1);
+		iopid->timescale = 1000;
+	}
 
 	p = gf_filter_pid_get_property(pid, GF_PROP_PID_CODECID);
 	if (p && (p->value.uint==GF_CODECID_RAW) && (iopid->stream_type==GF_STREAM_AUDIO)) {

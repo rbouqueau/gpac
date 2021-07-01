@@ -252,6 +252,9 @@ GF_Err naludmx_configure_pid(GF_Filter *filter, GF_FilterPid *pid, Bool is_remov
 			ctx->cur_fps.num = ctx->timescale;
 		}
 	}
+	printf("============================================\n");
+	printf("Romain rfnalu: prop ts = %u  -  ctx->timescale = %u    ***************\n", p ? p->value.uint : 0, ctx->timescale );
+	printf("============================================\n");
 
 	p = gf_filter_pid_get_property(pid, GF_PROP_PID_CODECID);
 	if (p) {
@@ -1511,6 +1514,9 @@ static void naludmx_check_pid(GF_Filter *filter, GF_NALUDmxCtx *ctx)
 		gf_filter_pid_set_property(ctx->opid, GF_PROP_PID_SAR, NULL);
 
 	gf_filter_pid_set_property(ctx->opid, GF_PROP_PID_FPS, & PROP_FRAC(ctx->cur_fps));
+	printf("Romain: =================\n");
+	printf("Romain: rfnalu: timescale: %d -> %d\n", ctx->timescale == NULL, (int)(ctx->timescale ? ctx->timescale : ctx->cur_fps.num));
+	printf("Romain: =================\n");
 	gf_filter_pid_set_property(ctx->opid, GF_PROP_PID_TIMESCALE, & PROP_UINT(ctx->timescale ? ctx->timescale : ctx->cur_fps.num));
 
 	if (ctx->explicit || !has_hevc_base) {

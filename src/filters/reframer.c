@@ -245,7 +245,10 @@ GF_Err reframer_configure_pid(GF_Filter *filter, GF_FilterPid *pid, Bool is_remo
 
 	p = gf_filter_pid_get_property(pid, GF_PROP_PID_TIMESCALE);
 	if (p) st->timescale = p->value.uint;
-	else st->timescale = 1000;
+	else  { 
+		printf("Romain: default timescale 1000 (2). Exiting.");
+		exit(1);st->timescale = 1000;
+	}
 
 	if (!st->all_saps) {
 		ctx->nb_non_saps--;
