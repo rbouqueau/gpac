@@ -607,9 +607,6 @@ static GF_Err ffenc_process_video(GF_Filter *filter, struct _gf_ffenc_ctx *ctx)
 			return GF_EOS;
 		}
 		if (ctx->remap_ts) {
-			printf("****************************\n");
-			printf("enc****remap_ts      *******\n");
-			printf("****************************\n");
 			UNSCALE_TS(pkt->dts);
 			UNSCALE_TS(pkt->pts);
 			UNSCALE_DUR(pkt->duration);
@@ -635,9 +632,6 @@ static GF_Err ffenc_process_video(GF_Filter *filter, struct _gf_ffenc_ctx *ctx)
 	if (ctx->init_cts_setup) {
 		ctx->init_cts_setup = GF_FALSE;
 		if (ctx->frame->pts != pkt->pts) {
-			printf("****************************\n");
-			printf("enc****init_cts_setup*******\n");
-			printf("****************************\n");
 			//check shift in PTS - most of the time this is 0 (ffmpeg does not restamp video pts)
 			ctx->ts_shift = (s64) ctx->cts_first_frame_plus_one - 1 - (s64) pkt->pts;
 
@@ -1786,7 +1780,6 @@ static Bool ffenc_process_event(GF_Filter *filter, const GF_FilterEvent *evt)
 		if ((ctx->fintra.num<0) && evt->encode_hints.intra_period.den && evt->encode_hints.intra_period.num) {
 			ctx->fintra = evt->encode_hints.intra_period;
 			if (!ctx->rc || (gf_list_count(ctx->src_packets) && !ctx->force_reconfig)) {
-				printf("romain: ffenc_process_event: reconfig\n");
 				ctx->reconfig_pending = GF_TRUE;
 				ctx->force_reconfig = GF_TRUE;
 			}
