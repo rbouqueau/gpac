@@ -1692,7 +1692,7 @@ static GF_Err ffenc_configure_pid_ex(GF_Filter *filter, GF_FilterPid *pid, Bool 
 		return GF_BAD_PARAM;
 	}
 	//precompute gpac_timescale * encoder->time_base.num for rescale operations
-	//do that AFTER opeing the codec, since some codecs may touch this field ...
+	//do that AFTER opening the codec, since some codecs may touch this field ...
 	ctx->premul_timescale = ctx->timescale;
 	ctx->premul_timescale *= ctx->encoder->time_base.num;
 
