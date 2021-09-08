@@ -1,7 +1,7 @@
 package com.gpac.Osmo4.extra;
 
 import android.os.Build;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.util.Log;
 
 import java.io.File;

@@ -90,8 +90,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 
-import com.lge.real3d.Real3D;
-import com.lge.real3d.Real3DInfo;
 /**
  * The main Osmo4 activity, used to launch everything
  *
@@ -103,8 +101,6 @@ public class Osmo4 extends Activity implements GpacCallback {
     // private String[] m_modules_list;
 	private static final int INITIAL_HIDE_DELAY = 300;
 
-	public boolean m3DLibraryLoaded = false;
-	private Real3D mReal3D;
 	private View mDecorView;
 
     private boolean shouldDeleteGpacConfig = false;
@@ -171,15 +167,6 @@ public class Osmo4 extends Activity implements GpacCallback {
 
 	context = getApplicationContext();
 
-        try {
-			Class c = Class.forName("com.lge.real3d.Real3D");
-			final String LGE_3D_DISPLAY = "lge.hardware.real3d.barrier.landscape";
-			if(this.getPackageManager().hasSystemFeature(LGE_3D_DISPLAY))
-				m3DLibraryLoaded = true;
-        }
-        catch (ClassNotFoundException e) {
-        	m3DLibraryLoaded = false;
-        }
 		MPEGVSensor.myAct = this;
         MPEGVSensor.initSensorManager((SensorManager) getSystemService(Context.SENSOR_SERVICE));
 		MPEGVSensor.initLocationManager((LocationManager)getSystemService(Context.LOCATION_SERVICE));
@@ -268,12 +255,6 @@ public class Osmo4 extends Activity implements GpacCallback {
 
         sensors = new SensorServices(this);
 
-        if( m3DLibraryLoaded ) //should be checking wether the terminal is a LG one
-        {
-        	//TryLoad3DClass(true);
-        	mReal3D = new Real3D(mGLView.getHolder());
-        	mReal3D.setReal3DInfo(new Real3DInfo(true, Real3D.REAL3D_TYPE_SS, Real3D.REAL3D_ORDER_LR));
-        }
         service.submit(new Runnable() {
 
             @Override
