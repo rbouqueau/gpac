@@ -2423,7 +2423,7 @@ GF_Err WriteToFile(GF_ISOFile *movie, Bool for_fragments)
 	}
 	//capture mode: we don't need a new bitstream
 	if (movie->openMode == GF_ISOM_OPEN_WRITE) {
-		if (!strcmp(movie->fileName, "_gpac_isobmff_redirect")) {
+		if (movie->fileName && !strcmp(movie->fileName, "_gpac_isobmff_redirect")) {
 			GF_BitStream *bs, *moov_bs=NULL;
 			u64 mdat_end = gf_bs_get_position(movie->editFileMap->bs);
 			u64 mdat_start = movie->mdat->bsOffset;
@@ -2503,7 +2503,7 @@ GF_Err WriteToFile(GF_ISOFile *movie, Bool for_fragments)
 		Bool is_stdout = GF_FALSE;
 		GF_BitStream *bs=NULL;
 
-		if (!strcmp(movie->finalName, "_gpac_isobmff_redirect")) {
+		if (movie->fileName && !strcmp(movie->finalName, "_gpac_isobmff_redirect")) {
 			if (!movie->on_block_out) {
 				GF_LOG(GF_LOG_ERROR, GF_LOG_CONTAINER, ("[ISOBMFF] Missing output block callback, cannot write\n"));
 				return GF_BAD_PARAM;

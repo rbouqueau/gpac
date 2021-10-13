@@ -1055,6 +1055,7 @@ static GF_Err StoreFragment(GF_ISOFile *movie, Bool load_mdat_only, s32 data_off
 			gf_bs_get_content(bs, &movie->moof->mdat, &movie->moof->mdat_size);
 
 			gf_bs_del(bs);
+			if (bs == movie->segment_bs) movie->segment_bs = NULL;
 			movie->editFileMap->bs = gf_bs_new(NULL, 0, GF_BITSTREAM_WRITE);
 		} else {
 			u64 frag_offset = movie->segment_start;
@@ -1483,10 +1484,14 @@ static void compute_seg_size(GF_ISOFile *movie, u64 *out_seg_size)
 	u64 final_size = 0;
 	if (out_seg_size) {
 		if (movie->append_segment) {
-			final_size = gf_bs_get_position(movie->movieFileMap->bs);
-			final_size -= movie->segment_start;
+			if (movie->movieFileMap && movie->movieFileMap->bs) {
+				final_size = gf_bs_get_position(movie->movieFileMap->bs);
+				final_size -= movie->segment_start;
+			}
 		} else if (movie->editFileMap) {
-			final_size = gf_bs_get_position(movie->editFileMap->bs);
+			if (movie->movieFileMap && movie->movieFileMap->bs) {
+				final_size = gf_bs_get_position(movie->editFileMap->bs);
+			}
 		}
 		*out_seg_size = final_size;
 	}
@@ -1668,8 +1673,10 @@ GF_Err gf_isom_close_segment(GF_ISOFile *movie, s32 subsegments_per_sidx, GF_ISO
 	}
 	/*restore final bitstream*/
 	if (movie->segment_bs) {
-		gf_bs_del(movie->editFileMap->bs);
-		movie->editFileMap->bs = movie->segment_bs;
+		if (movie->editFileMap->bs != movie->segment_bs) {
+			gf_bs_del(movie->editFileMap->bs);
+			movie->editFileMap->bs = movie->segment_bs;
+		}
 		movie->segment_bs = NULL;
 	}
 
@@ -1678,11 +1685,15 @@ GF_Err gf_isom_close_segment(GF_ISOFile *movie, s32 subsegments_per_sidx, GF_ISO
 		/*append segment marker box*/
 		if (segment_marker_4cc) {
 			if (movie->append_segment) {
-				gf_bs_write_u32(movie->movieFileMap->bs, 8);	//write size field
-				gf_bs_write_u32(movie->movieFileMap->bs, segment_marker_4cc); //write box type field
+				if (movie->movieFileMap && movie->movieFileMap->bs) {
+					gf_bs_write_u32(movie->movieFileMap->bs, 8);	//write size field
+					gf_bs_write_u32(movie->movieFileMap->bs, segment_marker_4cc); //write box type field
+				}
 			} else {
-				gf_bs_write_u32(movie->editFileMap->bs, 8);	//write size field
-				gf_bs_write_u32(movie->editFileMap->bs, segment_marker_4cc); //write box type field
+				if (movie->movieFileMap && movie->movieFileMap->bs) {
+					gf_bs_write_u32(movie->editFileMap->bs, 8);	//write size field
+					gf_bs_write_u32(movie->editFileMap->bs, segment_marker_4cc); //write box type field
+				}
 			}
 		}
 
