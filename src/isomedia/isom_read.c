@@ -532,12 +532,13 @@ GF_ISOFile *gf_isom_open(const char *fileName, GF_ISOOpenMode OpenMode, const ch
 }
 
 
-#if 0
+#if 1
 /*! gets access to the data bitstream  - see \ref gf_isom_open
 \param isom_file the target ISO file
 \param out_bs set to the file input bitstream - do NOT destroy
 \return error if any
 */
+GF_EXPORT
 GF_Err gf_isom_get_bs(GF_ISOFile *movie, GF_BitStream **out_bs)
 {
 #ifndef GPAC_DISABLE_ISOM_WRITE

@@ -1767,6 +1767,7 @@ GF_Err gf_odf_ac3_config_parse_bs(GF_BitStream *bs, Bool is_ec3, GF_AC3Config *c
 	return GF_OK;
 }
 
+GF_EXPORT
 GF_Err gf_odf_ac3_config_parse(u8 *dsi, u32 dsi_len, Bool is_ec3, GF_AC3Config *cfg)
 {
 	GF_BitStream *bs;
