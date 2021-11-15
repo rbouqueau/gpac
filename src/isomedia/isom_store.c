@@ -1019,10 +1019,10 @@ static GF_Err WriteFlat(MovieWriter *mw, u8 moovFirst, GF_BitStream *bs, Bool no
 	s32 moov_meta_pos=-1;
 
 	//in case we did a read on the file while producing it, seek to end of edit
-	totSize = gf_bs_get_size(bs);
+	/*totSize = gf_bs_get_size(bs);
 	if (gf_bs_get_position(bs) != totSize) {
 		gf_bs_seek(bs, totSize);
-	}
+	}*/
 	begin = totSize = 0;
 
 	//first setup the writers
