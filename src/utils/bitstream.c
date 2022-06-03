@@ -79,6 +79,7 @@ struct __tag_bitstream
 	u32 total_bits_read;
 };
 
+GF_EXPORT
 GF_Err gf_bs_reassign_buffer(GF_BitStream *bs, const u8 *buffer, u64 BufferSize)
 {
 	if (!bs) return GF_BAD_PARAM;
@@ -1308,6 +1309,7 @@ static GF_Err BS_SeekIntern(GF_BitStream *bs, u64 offset)
 GF_EXPORT
 GF_Err gf_bs_seek(GF_BitStream *bs, u64 offset)
 {
+	if (!bs) return GF_BAD_PARAM;
 	if (bs->on_block_out) {
 		GF_Err e;
 		if (offset < bs->bytes_out) {
@@ -1409,6 +1411,7 @@ u64 gf_bs_get_size(GF_BitStream *bs)
 GF_EXPORT
 u64 gf_bs_get_position(GF_BitStream *bs)
 {
+	if (!bs) return 0;
 	if (bs->cache_write)
 		return bs->position + bs->buffer_written;
 	return bs->position;
@@ -1541,6 +1544,7 @@ u32 gf_bs_read_vluimsbf5(GF_BitStream *bs)
 GF_EXPORT
 void gf_bs_truncate(GF_BitStream *bs)
 {
+	if (!bs) return;
 	bs->size = bs->position;
 }
 

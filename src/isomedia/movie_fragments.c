@@ -1056,7 +1056,7 @@ static GF_Err StoreFragment(GF_ISOFile *movie, Bool load_mdat_only, s32 data_off
 
 			gf_bs_del(bs);
 			if (bs == movie->segment_bs) movie->segment_bs = NULL;
-			movie->editFileMap->bs = gf_bs_new(NULL, 0, GF_BITSTREAM_WRITE);
+			bs = movie->editFileMap->bs = gf_bs_new(NULL, 0, GF_BITSTREAM_WRITE);
 		} else {
 			u64 frag_offset = movie->segment_start;
 			e = gf_bs_seek(bs, frag_offset);
@@ -1438,7 +1438,8 @@ GF_Err gf_isom_flush_fragments(GF_ISOFile *movie, Bool last_segment)
 
 	if (orig_bs != movie->editFileMap->bs) {
 		u32 tmpsize;
-		gf_bs_get_content_no_truncate(movie->editFileMap->bs, &movie->block_buffer, &tmpsize, &movie->block_buffer_size);
+		if (movie->block_buffer)
+			gf_bs_get_content_no_truncate(movie->editFileMap->bs, &movie->block_buffer, &tmpsize, &movie->block_buffer_size);
 		gf_bs_del(movie->editFileMap->bs);
 		movie->editFileMap->bs = orig_bs;
 		//we are dispatching through callbacks, the movie segment start is always 0
