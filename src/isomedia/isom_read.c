@@ -2991,7 +2991,7 @@ GF_Err gf_isom_refresh_fragmented(GF_ISOFile *movie, u64 *MissingBytes, const ch
 	}
 
 	prevsize = gf_bs_get_refreshed_size(movie->movieFileMap->bs);
-	if (prevsize==size) return GF_OK;
+	//if (prevsize==size) return GF_OK;
 
 	if (!movie->moov->mvex)
 		return GF_OK;
