@@ -184,7 +184,9 @@ static void ghi_dmx_send_seg_times(GHIDmxCtx *ctx, GHIStream *st, GF_FilterPid *
 		count=gf_list_count(st->segs_bin);
 	}
 	for (i=0; i<count; i++) {
-		GF_FilterPacket *pck = gf_filter_pck_new_alloc(opid, 0, NULL);
+		u8 *data;
+		// fake data size=1 avoids a downstream dasher to stop after the first segment
+		GF_FilterPacket *pck = gf_filter_pck_new_alloc(opid, 1, &data);
 		u32 dur;
 		u64 ts;
 #ifndef GPAC_DISABLE_MPD

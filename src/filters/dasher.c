@@ -7942,7 +7942,7 @@ send_packet:
 				//set constant duration to first packet duration (as used by mp4mx to compute defaults)
 				//this will avoid generating trex with different default duration if working with or without sample
 				if (!ds->rep->segment_list->sample_duration) {
-					ds->rep->segment_list->sample_duration = gf_filter_pck_get_duration(in_pck);
+					ds->rep->segment_list->sample_duration = in_pck ? gf_filter_pck_get_duration(in_pck) : 0;
 
 					ds->rep->segment_list->index_mode = GF_TRUE;
 					if (ds->pts_minus_cts<0)
