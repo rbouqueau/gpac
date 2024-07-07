@@ -441,8 +441,8 @@ void routein_on_event(void *udta, GF_ROUTEEventType evt, u32 evt_param, GF_ROUTE
 		return;
 	}
 
-	//partial, try to repair
-	if (ctx->repair && finfo->partial) {
+	//partial or late, try to repair
+	if (ctx->repair && (finfo->partial/*Romain: || gf_sys_clock() - ctx->last_timeout > ctx->timeout*/)) {
 		//blob flags are set there
 		routein_queue_repair(ctx, evt, evt_param, finfo);
 	} else {
@@ -516,9 +516,22 @@ static GF_Err routein_process(GF_Filter *filter)
 				else {
 					u32 diff = gf_sys_clock() - ctx->last_timeout;
 					if (diff > ctx->timeout) {
-						GF_LOG(GF_LOG_INFO, GF_LOG_ROUTE, ("[%s] No data for %d ms, aborting\n", ctx->log_name, diff));
+						GF_LOG(GF_LOG_INFO, GF_LOG_ROUTE, ("[%s] No data for %u ms, aborting\n", ctx->log_name, diff));
 						routein_set_eos(filter, ctx);
 						return GF_EOS;
+					}
+				}
+			} else {
+				u32 recv_timeout = gf_route_dmx_get_reception_timeout(ctx->route_dmx);
+				if (recv_timeout) {
+					if (!ctx->last_timeout) ctx->last_timeout = gf_sys_clock();
+					u32 diff = gf_sys_clock() - recv_timeout;
+					if (diff > recv_timeout) {
+						GF_LOG(GF_LOG_INFO, GF_LOG_ROUTE, ("[%s] No data for %u ms: trigger unicast repair (recv_timeout=%sms)\n", ctx->log_name, diff, recv_timeout));
+						e = routein_do_repair(ctx);
+						if (e == GF_EOS)
+							routein_set_eos(filter, ctx);
+						return e;
 					}
 				}
 			}
@@ -542,7 +555,7 @@ static GF_Err routein_process(GF_Filter *filter)
 	if (!ctx->tune_time) {
 	 	u32 diff = gf_sys_clock() - ctx->start_time;
 	 	if (diff>ctx->timeout) {
-			GF_LOG(GF_LOG_ERROR, GF_LOG_ROUTE, ("[%s] No data for %d ms, aborting\n", ctx->log_name, diff));
+			GF_LOG(GF_LOG_ERROR, GF_LOG_ROUTE, ("[%s] No data for %u ms, aborting\n", ctx->log_name, diff));
 			gf_filter_setup_failure(filter, GF_SERVICE_ERROR);
 			routein_set_eos(filter, ctx);
 			return GF_EOS;

@@ -120,9 +120,9 @@ typedef enum
 {
 	/* object is done receiving*/
 	GF_LCTO_PARTIAL_NONE=0,
-	/* object data being notfied is the begining of the payload*/
+	/* object data being notified is the begining of the payload*/
 	GF_LCTO_PARTIAL_BEGIN,
-	/* object data being notfied is the complete reception buffer (for low latency mode), POTENTIALLY with holes in it*/
+	/* object data being notified is the complete reception buffer (for low latency mode), POTENTIALLY with holes in it*/
 	GF_LCTO_PARTIAL_ANY,
 } GF_LCTObjectPartial;
 
@@ -277,6 +277,13 @@ GF_Err gf_route_set_dispatch_mode(GF_ROUTEDmx *routedmx, GF_RouteProgressiveDisp
 GF_Err gf_route_atsc3_tune_in(GF_ROUTEDmx *routedmx, u32 service_id, Bool tune_others);
 
 
+/*! Gets the timeout triggering the transportObjectReceptionTimeout
+\param routedmx the ROUTE demultiplexer
+\return timeout in ms
+ */
+u32 gf_route_dmx_get_reception_timeout(GF_ROUTEDmx *routedmx);
+
+
 /*! Gets the number of objects currently loaded in the service
 \param routedmx the ROUTE demultiplexer
 \param service_id ID of the service to query
@@ -347,7 +354,7 @@ u64 gf_route_dmx_get_nb_packets(GF_ROUTEDmx *routedmx);
  */
 u64 gf_route_dmx_get_recv_bytes(GF_ROUTEDmx *routedmx);
 
-/*! Gather only  objects with given TSI (for debug purposes)
+/*! Gather only objects with given TSI (for debug purposes)
 \param routedmx the ROUTE demultiplexer
 \param tsi the target TSI, 0 for no filtering
  */

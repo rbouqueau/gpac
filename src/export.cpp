@@ -2308,6 +2308,7 @@
 #pragma comment (linker, EXPORT_SYMBOL(gf_route_dmx_new_ex) )
 #pragma comment (linker, EXPORT_SYMBOL(gf_route_dmx_del) )
 #pragma comment (linker, EXPORT_SYMBOL(gf_route_atsc3_tune_in) )
+#pragma comment (linker, EXPORT_SYMBOL(gf_route_dmx_get_reception_timeout) )
 #pragma comment (linker, EXPORT_SYMBOL(gf_route_dmx_process) )
 #pragma comment (linker, EXPORT_SYMBOL(gf_route_dmx_get_object_count) )
 #pragma comment (linker, EXPORT_SYMBOL(gf_route_dmx_remove_object_by_name) )

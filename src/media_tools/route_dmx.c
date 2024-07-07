@@ -249,6 +249,7 @@ struct __gf_routedmx {
     GF_Mutex *blob_mx;
 
 	Bool dvb_mabr;
+	u32 recv_timeout;
 };
 
 static GF_Err dmx_process_service_route(GF_ROUTEDmx *routedmx, GF_ROUTEService *s, GF_ROUTESession *route_sess);
@@ -638,6 +639,13 @@ GF_Err gf_route_atsc3_tune_in(GF_ROUTEDmx *routedmx, u32 serviceID, Bool tune_al
 		}
 	}
 	return GF_OK;
+}
+
+GF_EXPORT
+u32 gf_route_dmx_get_reception_timeout(GF_ROUTEDmx *routedmx)
+{
+	if (!routedmx) return 0;
+	return routedmx->recv_timeout;
 }
 
 GF_EXPORT
@@ -1369,6 +1377,9 @@ static GF_Err gf_route_dmx_process_dvb_mcast_signaling(GF_ROUTEDmx *routedmx, GF
 			const char *dst_tsi = _xml_get_child_text(trp, "MediaTransportSessionIdentifier");
 			if (!dst_add || !dst_port_str || !dst_tsi) continue;
 			u16 dst_port = atoi(dst_port_str);
+
+			trp = _xml_get_child(trp, "UnicastRepairParameters");
+			routedmx->recv_timeout = atoi(_xml_get_attr(trp, "transportObjectReceptionTimeout"));
 
 			if (!new_s) {
 				//config session same as our bootstrap adress, do not process
