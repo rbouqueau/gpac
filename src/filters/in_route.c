@@ -442,7 +442,7 @@ void routein_on_event(void *udta, GF_ROUTEEventType evt, u32 evt_param, GF_ROUTE
 	}
 
 	//partial or late, try to repair
-	if (ctx->repair && (finfo->partial/*Romain: || gf_sys_clock() - ctx->last_timeout > ctx->timeout*/)) {
+	if (ctx->repair && finfo->partial) {
 		//blob flags are set there
 		routein_queue_repair(ctx, evt, evt_param, finfo);
 	} else {
