@@ -18,7 +18,8 @@ int main(int argc, char *argv[])
 {'
 
 
-calls=$(cd "$scriptDir/.." && find . -path "*/unittests/*.c" -not -path "./unittests/*" | grep -v bin | xargs grep unittest | cut -d ":" -f 2)
+# Match the component-source glob in src/Makefile, excluding build artifacts.
+calls=$(grep -h unittest "$scriptDir"/../src/*/unittests/ut_*.c)
 for call in $calls; do
     echo "  $call;"
 done

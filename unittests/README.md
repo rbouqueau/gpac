@@ -16,9 +16,14 @@ The unit tests pre-processing could happen along with other reformatting and che
 
 These tests are intented to complement existing tests from the testsuite.
 
+Run `sh unittests/test_sources.sh` to check source discovery and linking in clean
+and reused build trees containing an old generated runner and unrelated C files.
+
 ```gpac.c```also contains some unit tests of its own. They are unrelated to the runtime discussed in this document.
 
 ## Writing a unit test
+
+Place component test files in `src/<component>/unittests/ut_*.c`.
 
 Include the unit test framework:
 ```
